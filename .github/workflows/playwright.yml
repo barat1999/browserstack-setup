@@ -20,26 +20,31 @@ jobs:
       run: npx playwright install --with-deps
     - name: Run Playwright tests
       run: npx playwright test
+    - name: Preserve Playwright report
+      if: always()
+      run: |
+        rm -rf /tmp/playwright-report
+        cp -r playwright-report /tmp/playwright-report
+
     - name: Publish report to gh-pages
       if: always()
       run: |
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
         git fetch origin gh-pages
-
         git checkout gh-pages
 
-        # Remove previous report
-        rm -rf *
+        # Remove old report files, but keep .git
+        find . -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
 
-        # Copy the newly generated report
-        cp -r ../playwright-report/* .
+        # Copy the new report
+        cp -r /tmp/playwright-report/* .
 
-        # Add and commit the new report
+        # Commit the new report
         git add .
 
-        git commit -m "Update test report" || echo "No changes to commit"
+        git commit -m "Update Playwright test report" || echo "No changes to commit"
 
-        # Push updated report
+        # Push to GitHub
         git push origin gh-pages
