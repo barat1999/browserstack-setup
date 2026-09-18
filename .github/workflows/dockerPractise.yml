@@ -1,0 +1,48 @@
+name: Playwright Tests
+on:
+  workflow_dispatch:  
+permissions:
+  contents: write  
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: lts/*
+    - name: Install dependencies
+      run: npm ci
+    - name: Build Docker image
+      run: docker build -t playwright-ci .  
+    - name: Run Playwright tests
+      run: npx playwright test
+    - name: Preserve Playwright report
+      if: always()
+      run: |
+        rm -rf /tmp/playwright-report
+        cp -r playwright-report /tmp/playwright-report
+
+    - name: Publish report to gh-pages
+      if: always()
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        git fetch origin gh-pages
+        git checkout gh-pages
+
+        # Remove old report files, but keep .git
+        find . -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
+
+        # Copy the new report
+        cp -r /tmp/playwright-report/* .
+
+        # Commit the new report
+        git add .
+
+        git commit -m "Update Playwright test report" || echo "No changes to commit"
+
+        # Push to GitHub
+        git push origin gh-pages
