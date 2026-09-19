@@ -1,43 +1,53 @@
-name: Docker Practise
+name: Playwright Tests
+
 on:
-  workflow_dispatch:  
+  workflow_dispatch:
+
 permissions:
-  contents: write  
+  contents: write
+
 jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Build Docker image
-      run: docker build -t playwright-ci .  
-    - name: Run Playwright tests in Docker
-      run: docker run --rm playwright-ci
-    - name: Preserve Playwright report
-      if: always()
-      run: |
-        rm -rf /tmp/playwright-report
-        cp -r playwright-report /tmp/playwright-report
+      - uses: actions/checkout@v4
 
-    - name: Publish report to gh-pages
-      if: always()
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Build Docker image
+        run: docker build -t playwright-ci .
 
-        git fetch origin gh-pages
-        git checkout gh-pages
+      - name: Run Playwright tests in Docker
+        run: |
+          mkdir -p playwright-report
+          mkdir -p test-results
 
-        # Remove old report files, but keep .git
-        find . -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
+          docker run --rm \
+            -v "${{ github.workspace }}/playwright-report:/app/playwright-report" \
+            -v "${{ github.workspace }}/test-results:/app/test-results" \
+            playwright-ci
 
-        # Copy the new report
-        cp -r /tmp/playwright-report/* .
+      - name: Preserve Playwright report
+        if: always()
+        run: |
+          rm -rf /tmp/playwright-report
+          mkdir -p /tmp/playwright-report
+          cp -r playwright-report/. /tmp/playwright-report/
 
-        # Commit the new report
-        git add .
+      - name: Publish report to gh-pages
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@github.com"
 
-        git commit -m "Update Playwright test report" || echo "No changes to commit"
+          git fetch origin gh-pages
+          git checkout gh-pages
 
-        # Push to GitHub
-        git push origin gh-pages
+          find . -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
+
+          cp -r /tmp/playwright-report/. .
+
+          git add .
+
+          git commit -m "Update Playwright test report" || echo "No changes to commit"
+
+          git push origin gh-pages
